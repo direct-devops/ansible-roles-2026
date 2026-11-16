@@ -1,0 +1,5 @@
+- name: deploy ansible roles
+  hosts: all
+  become: yes
+  roles:
+    - tomcat

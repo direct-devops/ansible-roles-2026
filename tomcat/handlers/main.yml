@@ -1,3 +1,13 @@
 #SPDX-License-Identifier: MIT-0
 ---
 # handlers file for tomcat
+
+- name: reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: yes
+
+- name: start tomcat service
+  ansible.builtin.systemd:
+    name: tomcat
+    state: started
+    enabled: yes

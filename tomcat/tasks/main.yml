@@ -1,3 +1,88 @@
 #SPDX-License-Identifier: MIT-0
 ---
 # tasks file for tomcat
+
+- name: java installation
+  ansible.builtin.apt:
+    name: "{{ java_package }}"
+    state: present
+    update_cache: yes
+
+- name: create tomcat group
+  ansible.builtin.group:
+    name: "{{ tomcat_group }}"
+    system: yes
+    state: present
+
+- name: create tomcat user
+  ansible.builtin.user:
+    name: "{{ tomcat_user }}"
+    group: "{{ tomcat_group }}"
+    home: "{{ home }}"
+    shell: /bin/false
+    system: yes
+    state: present
+
+- name: download tomcat
+  ansible.builtin.get_url:
+    url: "{{ url }}"
+    dest: "/tmp/apache-tomcat-{{ tomcat_version }}.tar.gz"
+
+- name: extract tomcat
+  ansible.builtin.unarchive:
+    src: "/tmp/apache-tomcat-{{ tomcat_version }}.tar.gz"
+    dest: /opt/tomcat
+    remote_src: yes
+
+- name: change ownership of tomcat directory
+  ansible.builtin.file:
+    path: /opt/tomcat
+    state: directory
+    recurse: yes
+    owner: "{{ tomcat_user }}"
+    group: "{{ tomcat_group }}"
+
+- name: provide execute permission to tomcat scripts
+  ansible.builtin.file:
+    path: /opt/tomcat/bin
+    state: directory
+    recurse: yes
+    mode: u+x
+
+- name: update java alternatives
+  ansible.builtin.shell:
+    cmd: update-java-alternatives -l
+
+- name: create tomcat service file
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/tomcat.service
+    content: |
+      [Unit]
+      Description=Tomcat
+      After=network.target
+
+      [Service]
+      Type=forking
+
+      User=tomcat
+      Group=tomcat
+
+      Environment="JAVA_HOME=/usr/lib/jvm/java-1.25.0-openjdk-amd64"
+      Environment="JAVA_OPTS=-Djava.security.egd=file:///dev/urandom"
+      Environment="CATALINA_BASE=/opt/tomcat"
+      Environment="CATALINA_HOME=/opt/tomcat"
+      Environment="CATALINA_PID=/opt/tomcat/temp/tomcat.pid"
+      Environment="CATALINA_OPTS=-Xms512M -Xmx1024M -server -XX:+UseParallelGC"
+
+      ExecStart=/opt/tomcat/bin/startup.sh
+      ExecStop=/opt/tomcat/bin/shutdown.sh
+
+      RestartSec=10
+      Restart=always
+
+      [Install]
+      WantedBy=multi-user.target
+  notify:
+    - reload systemd daemon
+    - start tomcat service
+
